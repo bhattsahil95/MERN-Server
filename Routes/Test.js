@@ -4,7 +4,7 @@ import { TestModel } from "../Models/TestBegin.js";
 import  _  from 'lodash';
 import bcrypt from 'bcrypt';
 import multer from 'multer'; 
-import {MongoClient} from 'mongodb'
+import { io } from "../index.js";
 
 
 
@@ -97,7 +97,8 @@ router.post('/2', (req,res) => {
 
 
 router.get('/', (req, res) => {
-  res.send("Router is working fine!")
+  res.send("Router is working fine!"); 
+  io.emit('testRoute', 'Test Router is Working'); 
 })
 
 

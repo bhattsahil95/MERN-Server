@@ -21,7 +21,7 @@ async function connectToMongoDB() {
       const endTime = new Date(); // Timestamp after successful connection
       const elapsedTime = (endTime - startTime) / 1000; // Calculate elapsed time in seconds
   
-      console.log(`Connected to MongoDB Atlas in ${elapsedTime} seconds`);
+      console.log(`${startTime}  ==> Connected to MongoDB Atlas in ${elapsedTime} seconds`);
         
       const db = mongoose.connection;
       return db;
