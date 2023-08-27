@@ -9,6 +9,7 @@ import createSocketServer from "./socket.js";
 //File Imports
 import { testRouter } from "./Routes/Test.js";
 import { noteRouter } from "./Routes/Note.js";
+import { contactRouter } from "./Routes/Contact.js";
 import beginDB from "./Models/TestBegin.js";
 import beginDBTest from "./Models/NoteModel.js";
 import { createServer } from "http";
@@ -43,6 +44,7 @@ app.get("/", function (req, res) {
 
 app.use("/test", testRouter);
 app.use("/note", noteRouter);
+app.use("/contact", contactRouter);
 
 //Start Express App
 httpServer.listen(ServerPort, () => {
