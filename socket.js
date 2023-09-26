@@ -2,7 +2,12 @@ import { Server } from "socket.io";
 
 const createSocketServer = (httpServer) => {
     const io = new Server(httpServer, {
-        cors: { origin: "https://sahil-bhatt.onrender.com" },
+        cors: {
+            origin: [
+                "http://localhost:3000",
+                "https://sahil-bhatt.onrender.com",
+            ],
+        },
     });
 
     io.on("connection", (socket) => {

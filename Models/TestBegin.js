@@ -8,7 +8,7 @@ const testSchema = new mongoose.Schema({
 
 })
 
-const TestModel = mongoose.model('test', testSchema) // Creates a new collection in mongoDB// 
+const TestModel = mongoose.model('test', testSchema) 
 
 
 let fakeData = {
