@@ -1,7 +1,9 @@
 import mongoose from "mongoose"; // Importing Mongoose for MongoDB interactions
 import { config } from "dotenv";
+import dns from "node:dns";
 
 config();
+dns.setServers(["8.8.8.8", "1.1.1.1"]);
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@${process.env.DB_NAME}.szcu3wa.mongodb.net/MERN?retryWrites=true&w=majority`;
 // Optional configurations
@@ -27,9 +29,9 @@ async function connectToMongoDB() {
         const db = mongoose.connection;
         return db;
 
-        // Start your application or perform database operations
+        // Start your application or perform database operations 
     } catch (error) {
-        console.error("Failed to connect to MongoDB Atlas:", error);
+        console.error("Failed to connect to MongoDB Atlas from the backend Server:", error);
     }
 }
 

@@ -4,16 +4,17 @@ import cors from "cors";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import { config } from "dotenv";
-import createSocketServer from "./socket.js";
+import { createServer } from "http";
 
 //File Imports
 import { testRouter } from "./Routes/Test.js";
 import { noteRouter } from "./Routes/Note.js";
 import { contactRouter } from "./Routes/Contact.js";
+import { chatRoute } from "./Routes/chat.js";
 import beginDB from "./Models/TestBegin.js";
 import beginDBTest from "./Models/NoteModel.js";
-import { createServer } from "http";
-
+import createSocketServer from "./Services/Sockets/socket.js";
+import { instrument } from "@socket.io/admin-ui";
 //Configuration
 config();
 
@@ -33,6 +34,13 @@ const httpServer = createServer(app);
 // Socket server connection
 const io = createSocketServer(httpServer);
 
+//Connecting to Socket.io admin UI
+instrument(io, {
+    auth: false,
+    mode: "development",
+    namespaceName: "/admin",
+});
+
 //mongoDB Connection
 beginDB();
 beginDBTest();
@@ -45,10 +53,15 @@ app.get("/", function (req, res) {
 app.use("/test", testRouter);
 app.use("/note", noteRouter);
 app.use("/contact", contactRouter);
+app.use("/chat", chatRoute);
 
 //Start Express App
 httpServer.listen(ServerPort, () => {
-    console.log(`Started Express app on port ${ServerPort} `);
+    console.log(`
+  ╔═════════════════════════════════════════╗
+  ║    BACKEND SERVER is LIVE. PORT:${ServerPort}    ║
+  ╚═════════════════════════════════════════╝
+`);
 });
 
 export { io };
