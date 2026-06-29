@@ -2,6 +2,8 @@
 const handleNotesNamespace = (notesNamespace) => {
     notesNamespace.on("connection", (socket) => {
         console.log(`JOINED /mern-notes ==> ${socket.id} `);
+        notesNamespace.emit('userCount', notesNamespace.sockets.size);
+
         socket.on("message", () => {
             socket.broadcast.emit("message", "Client: Message .");
         });
@@ -22,6 +24,7 @@ const handleNotesNamespace = (notesNamespace) => {
         });
 
         socket.on("disconnect", () => {
+            notesNamespace.emit('userCount', notesNamespace.sockets.size);
             console.log(`LEFT /mern-notes ==> ${socket.id} `);
         });
     });

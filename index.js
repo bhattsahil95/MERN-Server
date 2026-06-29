@@ -22,7 +22,8 @@ config();
 const app = express();
 const ServerPort = process.env.PORT || 5500; // Use environment variable PORT if available, otherwise use 5500 // Only to be used in the development. Shall be replaced in the production with .env
 app.use(express.json());
-app.use(cors());
+app.use(express.urlencoded({ extended: true }));
+app.use(cors({ origin: true, credentials: true }));
 
 //Paths
 const __filename = fileURLToPath(import.meta.url);
@@ -47,7 +48,11 @@ beginDBTest();
 
 // API Routers
 app.get("/", function (req, res) {
-    res.send("Active! Sahil ");
+    res.json({ ok: true, message: "API is active." });
+});
+
+app.get("/health", function (req, res) {
+    res.json({ ok: true, service: "server", timestamp: new Date().toISOString() });
 });
 
 app.use("/test", testRouter);

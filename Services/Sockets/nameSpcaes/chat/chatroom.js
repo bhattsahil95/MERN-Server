@@ -21,8 +21,16 @@ const handleChatNamespace = (chatNamespace) => {
 
         socket.on("newChatUser", ({ userName, chatId }) => {
             const userData = { userName, chatId };
-            chatUsers.push(userData);
-            chatIdToSocketIdMap.set(chatId, socket.id); // Map
+            const existingIndex = chatUsers.findIndex((entry) => entry.chatId === chatId);
+
+            if (existingIndex !== -1) {
+                chatUsers[existingIndex] = userData;
+            } else {
+                chatUsers.push(userData);
+            }
+
+            socket.data = { ...socket.data, chatId, userName };
+            chatIdToSocketIdMap.set(chatId, socket.id);
             chatNamespace.emit("userUpdate", {
                 type: "add",
                 who: userData,
@@ -54,24 +62,37 @@ const handleChatNamespace = (chatNamespace) => {
         // 1 on 1 chat request confirmation
         socket.on("confirmationResponse", (data) => {
             const { guestResponse, chatParty } = data;
-            const { guest } = chatParty;
-            const hostSocketId = chatIdToSocketIdMap.get(chatParty.host.id);
+            const { host, guest } = chatParty;
+            const hostSocketId = chatIdToSocketIdMap.get(host.id);
+            const guestSocketId = chatIdToSocketIdMap.get(guest.id);
 
             if (guestResponse === "yes") {
-                chatNamespace
-                    .to(hostSocketId)
-                    .emit("chatRequestAccept", { guest });
+                if (hostSocketId) {
+                    chatNamespace.to(hostSocketId).emit("chatRequestAccept", { host, guest });
+                }
+                if (guestSocketId) {
+                    chatNamespace.to(guestSocketId).emit("chatRequestAccepted", { host, guest });
+                }
+                socket.data = { ...socket.data, activeChatWith: host.id };
+                const hostSocket = chatNamespace.sockets.get(hostSocketId);
+                if (hostSocket) {
+                    hostSocket.data = { ...hostSocket.data, activeChatWith: guest.id };
+                }
             } else {
-                chatNamespace
-                    .to(hostSocketId)
-                    .emit("chatRequestDecline", { guest });
+                if (hostSocketId) {
+                    chatNamespace.to(hostSocketId).emit("chatRequestDecline", { guest });
+                }
             }
         });
 
         //1 on 1 chatt features
 
         socket.on("chatLeft", (data) => {
-            chatNamespace.to(chatIdToSocketIdMap.get(data.id)).emit("chatLeft");
+            const otherSocketId = chatIdToSocketIdMap.get(data.id);
+            if (otherSocketId) {
+                chatNamespace.to(otherSocketId).emit("chatLeft");
+            }
+            socket.data = { ...socket.data, activeChatWith: null };
         });
 
         socket.on("removeChatUser", ({ userName, chatId }) => {
@@ -79,7 +100,9 @@ const handleChatNamespace = (chatNamespace) => {
                 (user) => user.userName === userName && user.chatId === chatId
             );
 
-            chatIdToSocketIdMap.delete(chatId); //Map
+            if (chatId) {
+                chatIdToSocketIdMap.delete(chatId);
+            }
 
             if (index !== -1) {
                 const removedUser = chatUsers.splice(index, 1)[0];
@@ -116,29 +139,105 @@ const handleChatNamespace = (chatNamespace) => {
         });
 
         socket.on("updateRoom", (newRoom) => {
-            socket.broadcast.emit("addRoom", newRoom);
-            rooms.push(newRoom);
+            if (!newRoom || !newRoom.id) return;
+
+            const roomAlreadyExists = rooms.some((room) => room.id === newRoom.id);
+            if (!roomAlreadyExists) {
+                rooms.push(newRoom);
+            }
+
+            chatNamespace.emit("addRoom", newRoom);
             console.log(rooms);
         });
 
         socket.on("deleteRoom", (roomId) => {
-            socket.broadcast.emit("deleteRoom", roomId);
+            chatNamespace.emit("deleteRoom", roomId);
             removeRoomById(roomId);
             console.log(rooms);
         });
 
+        socket.on("joinRoom", ({ roomId, roomKey }) => {
+            const room = rooms.find((entry) => entry.id === roomId);
+
+            if (!room) {
+                socket.emit("joinRoomError", { message: "That room no longer exists." });
+                return;
+            }
+
+            const providedKey = String(roomKey || "").trim();
+            const storedKey = String(room.roomKey || "").trim();
+
+            if (room.isPrivate && storedKey && providedKey !== storedKey) {
+                socket.emit("joinRoomError", { message: "Incorrect room password." });
+                return;
+            }
+
+            if (!socket.rooms.has(roomId)) {
+                socket.join(roomId);
+            }
+
+            const userName = socket.data?.userName || "A user";
+            chatNamespace.to(roomId).emit("roomSystemMessage", {
+                type: "system",
+                roomId,
+                text: `${userName} joined the room.`,
+            });
+            socket.emit("roomJoined", { roomId, roomName: room.name });
+        });
+
+        socket.on("leaveRoom", (roomId) => {
+            const userName = socket.data?.userName || "A user";
+            if (socket.rooms.has(roomId)) {
+                socket.leave(roomId);
+                chatNamespace.to(roomId).emit("roomSystemMessage", {
+                    type: "system",
+                    roomId,
+                    text: `${userName} left the room.`,
+                });
+            }
+        });
+
         socket.on("sendRoomMessage", (data) => {
-            socket.broadcast.emit("receiveRoomMessage", data);
+            if (!data?.roomId) return;
+            chatNamespace.to(data.roomId).emit("receiveRoomMessage", data);
             console.log(data);
         });
 
         socket.on("disconnect", () => {
-            console.log(`LEFT /chatroom ==> ${socket.id} `);
-            for (let [k, v] of chatIdToSocketIdMap) {
-                if (v === socket.id) {
-                    chatIdToSocketIdMap.delete(k);
+            const userName = socket.data?.userName || "A user";
+            const chatId = socket.data?.chatId;
+            const joinedRooms = Array.from(socket.rooms).filter((roomId) => roomId !== socket.id);
+            const activeChatWith = socket.data?.activeChatWith;
+
+            if (activeChatWith) {
+                const peerSocketId = chatIdToSocketIdMap.get(activeChatWith);
+                if (peerSocketId) {
+                    chatNamespace.to(peerSocketId).emit("chatLeft");
                 }
             }
+
+            joinedRooms.forEach((roomId) => {
+                chatNamespace.to(roomId).emit("roomSystemMessage", {
+                    type: "system",
+                    roomId,
+                    text: `${userName} left the room.`,
+                });
+            });
+
+            if (chatId) {
+                chatIdToSocketIdMap.delete(chatId);
+                const index = chatUsers.findIndex((user) => user.chatId === chatId);
+                if (index !== -1) {
+                    const removedUser = chatUsers.splice(index, 1)[0];
+                    chatNamespace.emit("userUpdate", {
+                        type: "remove",
+                        who: removedUser,
+                        users: chatUsers,
+                    });
+                }
+            }
+
+            console.log(`LEFT /chatroom ==> ${socket.id} `);
         });
     });
 };
