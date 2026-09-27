@@ -1,11 +1,13 @@
+// Scope: stores validated portfolio contact submissions.
+
 import mongoose from "mongoose";
 
 const submissionSchema = new mongoose.Schema({
-    firstName: String,
-    lastName: String,
-    phoneNumber: String,
-    email: String,
-    message: String,
+    firstName: { type: String, required: true, trim: true, maxlength: 60 },
+    lastName: { type: String, required: true, trim: true, maxlength: 60 },
+    phoneNumber: { type: String, required: true, trim: true, maxlength: 30 },
+    email: { type: String, required: true, trim: true, lowercase: true, maxlength: 254 },
+    message: { type: String, required: true, trim: true, maxlength: 4000 },
     timestamp: { type: Date, default: Date.now },
 });
 

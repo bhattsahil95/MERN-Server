@@ -1,8 +1,10 @@
+// Scope: defines and mutates validated notes used by the public portfolio demo.
+
 import mongoose from "mongoose";
 
 const noteSchema = new mongoose.Schema({
-    title: { type: String, required: true },
-    content: { type: String, required: true },
+    title: { type: String, required: true, trim: true, maxlength: 120 },
+    content: { type: String, required: true, trim: true, maxlength: 10000 },
     timeCreated: { type: Date, default: Date.now },
     lastUpdated: { type: Date, default: Date.now },
     status: { type: String, enum: ['active', 'deleted', 'draft'], default: 'active' }
@@ -53,10 +55,11 @@ export default async function beginDBTest() {
 
 // Function to create a new note using Mongoose
 async function createNote(noteData) {
-  const { title, content } = noteData;
+  const title = String(noteData?.title || "").trim();
+  const content = String(noteData?.content || "").trim();
 
   // Check if title and content are present
-  if (!title || !content) {
+  if (!title || !content || title.length > 120 || content.length > 10000) {
     throw new Error("Title and content are required.");
   }
 
@@ -84,7 +87,9 @@ const allowedUpdateFields = ['title', 'content'];
  // Iterate through allowed fields and add them to the 'updateData' object
  allowedUpdateFields.forEach(field => {
    if (updatedFields.hasOwnProperty(field)) {
-     updateData[field] = updatedFields[field];
+     const value = String(updatedFields[field] || "").trim();
+     const maximum = field === "title" ? 120 : 10000;
+     if (value && value.length <= maximum) updateData[field] = value;
    }
  });
 
@@ -98,7 +103,7 @@ const allowedUpdateFields = ['title', 'content'];
     
 try {
  
-    const result = await NoteModel.findByIdAndUpdate(noteId, updateData);
+    const result = await NoteModel.findByIdAndUpdate(noteId, updateData, { runValidators: true });
 
     if (!result) {
       return { success: false, message: 'Note not found' };
@@ -129,18 +134,24 @@ async function softDeleteNote(noteId) {
   }
 }
 
-
-
-// Delete a note by ID
-async function deleteNote(id) {
+// Restore an archived note to the active collection.
+async function restoreNote(noteId) {
   try {
-    const deletedNote = await NoteModel.findByIdAndDelete(id);
-    return deletedNote;
+    const result = await NoteModel.findOneAndUpdate(
+      { _id: noteId, status: 'deleted' },
+      { status: 'active', lastUpdated: new Date() },
+      { new: true, runValidators: true }
+    );
+
+    if (!result) return { success: false, message: 'Archived note not found' };
+    return { success: true, message: 'Note restored successfully' };
   } catch (error) {
-    throw new Error("Error deleting note");
+    return { success: false, message: 'An error occurred while restoring the note' };
   }
 }
 
-export { createNote, updateNote, deleteNote, NoteModel, softDeleteNote };
+
+
+export { createNote, updateNote, NoteModel, softDeleteNote, restoreNote };
 
 

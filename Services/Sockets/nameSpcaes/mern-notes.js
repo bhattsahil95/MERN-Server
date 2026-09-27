@@ -1,4 +1,5 @@
-// notesNamespace.js
+// Scope: broadcasts collaborative note changes and live-user counts.
+
 const handleNotesNamespace = (notesNamespace) => {
     notesNamespace.on("connection", (socket) => {
         console.log(`JOINED /mern-notes ==> ${socket.id} `);
@@ -11,8 +12,8 @@ const handleNotesNamespace = (notesNamespace) => {
             socket.broadcast.emit("updatePage", "Someone added a note.");
         });
 
-        socket.on("deleteNote", () => {
-            socket.broadcast.emit("updatePage", "Someone deleted a note.");
+        socket.on("archiveNote", () => {
+            socket.broadcast.emit("updatePage", "Someone archived a note.");
         });
 
         socket.on("updateNote", () => {

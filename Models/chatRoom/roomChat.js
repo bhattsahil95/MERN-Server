@@ -1,3 +1,5 @@
+// Scope: defines persisted room metadata without storing plaintext passwords.
+
 import mongoose from "mongoose";
 
 const roomSchema = new mongoose.Schema({
@@ -5,7 +7,7 @@ const roomSchema = new mongoose.Schema({
     name: { type: String },
     hostId: { type: String },
     isPrivate: { type: Boolean },
-    roomKey: { type: String },
+    roomKeyHash: { type: String, select: false },
 });
 
 const roomModel = mongoose.model("Room", roomSchema);

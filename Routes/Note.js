@@ -1,19 +1,13 @@
+// Scope: exposes the bounded public notes demo API.
+
 import  express  from "express";
 import db from "../Models/connect.js";
-import  {createNote, updateNote, deleteNote, softDeleteNote}  from "../Models/NoteModel.js";
-import _ from 'lodash';
-import multer from 'multer'
+import  {createNote, updateNote, softDeleteNote, restoreNote}  from "../Models/NoteModel.js";
+import { createRateLimit } from "../middleware/rateLimit.js";
 
 const router = express.Router();
 
-// Create a multer instance
-const upload = multer();
-
-// Use multer as middleware to handle form data
-router.use(upload.any());
-
-// Use middleware for JSON data
-router.use(express.json());
+const noteWriteRateLimit = createRateLimit({ limit: 30, windowMs: 60_000 });
 
 
 ////////////////////////////////////////////////// ROUTES ////////////////////////////////////////////////////
@@ -33,7 +27,13 @@ router.get('/data', async (req, res) => {
 
     try{
         const dbInstance = await db;
-        const data = await dbInstance.collection('notes').find().sort({ timeCreated: -1 }).toArray();
+        const requestedStatus = req.query.status || 'active';
+        const allowedStatuses = new Set(['active', 'deleted', 'draft']);
+        if (!allowedStatuses.has(requestedStatus)) {
+          res.status(400).json({ error: 'Invalid note status' });
+          return;
+        }
+        const data = await dbInstance.collection('notes').find({ status: requestedStatus }).sort({ timeCreated: -1 }).toArray();
         // const data = await dbInstance.collection('notes').find().toArray();
         res.json(data)
     }catch (error) {
@@ -97,7 +97,7 @@ router.get('/data/:status?', async (req, res) => {
 //////////////// POST //////////////////
 
 // Route to create a new note
-router.post("/create", async (req, res) => {
+router.post("/create", noteWriteRateLimit, async (req, res) => {
     const noteData = req.body;
   
     try {
@@ -115,7 +115,7 @@ router.post("/create", async (req, res) => {
 
 // /////////// PUT //////////////////////
 
-router.put('/update/:id', async (req, res) => {
+router.put('/update/:id', noteWriteRateLimit, async (req, res) => {
     const noteId = req.params.id;
     const updatedFields = req.body;
   
@@ -129,7 +129,7 @@ router.put('/update/:id', async (req, res) => {
   });
 
 
-  router.put('/soft-delete/:id', async (req, res) => {
+  router.put('/soft-delete/:id', noteWriteRateLimit, async (req, res) => {
     const noteId = req.params.id;
   
     const result = await softDeleteNote(noteId);
@@ -140,25 +140,12 @@ router.put('/update/:id', async (req, res) => {
       res.status(404).json({ message: result.message });
     }
   });
-  
 
-  //------------------------------------------------//
-  router.delete('/delete/:id', async (req, res) => {
-    const noteId = req.params.id;
-  
-    try {
-      const deletedNote = await deleteNote(noteId);
-  
-      if (deletedNote) {
-        res.status(200).json({ message: 'Note deleted successfully' });
-      } else {
-        res.status(404).json({ message: 'Note not found' });
-      }
-    } catch (error) {
-      res.status(500).json({ message: 'An error occurred while deleting the note' });
-    }
+  router.put('/restore/:id', noteWriteRateLimit, async (req, res) => {
+    const result = await restoreNote(req.params.id);
+    res.status(result.success ? 200 : 404).json({ message: result.message });
   });
-
+  
 
 export {router as noteRouter} ;
 
